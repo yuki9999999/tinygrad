@@ -37,18 +37,22 @@ def linearize(sink:UOp) -> list[UOp]:
       case Ops.END: priority = -5     # placing END is bad
       case _: priority = 0            # everything else has priority 0
     priorities[u] = (run_count, priority, extra)
-
+    stable_idx = {}
+    for i, u in enumerate(lst):
+      if u not in stable_idx:
+        stable_idx[u] = i
+    
   # number the uops in "ideal" order
-  nkey = {u:i for i,u in enumerate(sorted(lst, key=lambda x: priorities[x]+(x.tuplize if TUPLE_ORDER else (lst.index(x),))))}
+  nkey = {u:i for i,u in enumerate(sorted(lst, key=lambda x: priorities[x]+(x.tuplize if TUPLE_ORDER else (stable_idx[x],))))}
 
   # then force them to be toposorted in as close to the ideal order as possible
-  heap = [(-nkey[sink], sink.tuplize, sink)]
+  heap = [(-nkey[sink], sink)]
   newlst = []
   while heap:
-    newlst.append(u:=heapq.heappop(heap)[2])
+    newlst.append(u:=heapq.heappop(heap)[1])
     for v in u.src:
       out_degree[v] -= 1
-      if out_degree[v] == 0: heapq.heappush(heap, (-nkey[v], v.tuplize, v))
+      if out_degree[v] == 0: heapq.heappush(heap, (-nkey[v],v))
   newlst = newlst[::-1]
 
   if getenv("DEBUG_LINEARIZE"):
