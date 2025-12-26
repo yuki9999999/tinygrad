@@ -1,5 +1,4 @@
 import heapq
-from typing import Any
 from collections import defaultdict
 from tinygrad.uop.ops import PatternMatcher, UOp, Ops, UPat, multirange_str
 from tinygrad.helpers import prod, getenv, TUPLE_ORDER
@@ -10,7 +9,7 @@ def linearize(sink:UOp) -> list[UOp]:
   consumers: defaultdict[UOp, list[UOp]] = defaultdict(list)
   in_degree:dict[UOp, int] = {}
   out_degree:dict[UOp, int] = {}
-  priorities:dict[UOp, tuple[int, int, Any]] = {}
+  priorities:dict[UOp, tuple] = {}
 
   # get consumers and assign priorities
   # NOTE: this requires the lst be locally toposorted
@@ -36,10 +35,10 @@ def linearize(sink:UOp) -> list[UOp]:
       case Ops.RANGE: priority = 5    # placing RANGE is good
       case Ops.END: priority = -5     # placing END is bad
       case _: priority = 0            # everything else has priority 0
-    priorities[u] = (run_count, priority, extra)
+    priorities[u] = (run_count, priority, len(priorities) if u.op in {Ops.KERNEL, Ops.AFTER} else -in_degree[u], extra) if not TUPLE_ORDER else (run_count, priority, extra)
 
   # number the uops in "ideal" order
-  nkey = {u:i for i,u in enumerate(sorted(lst, key=lambda x: priorities[x]+(x.tuplize if TUPLE_ORDER else (-len(x.src), lst.index(x)))))}
+  nkey = {u:i for i,u in enumerate(sorted(lst, key=lambda x: priorities[x]+(x.tuplize if TUPLE_ORDER else ())))}
 
   # then force them to be toposorted in as close to the ideal order as possible
   heap = [(-nkey[sink], sink)]
